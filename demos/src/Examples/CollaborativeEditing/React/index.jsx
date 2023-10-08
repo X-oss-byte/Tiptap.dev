@@ -1,6 +1,6 @@
 import './styles.scss'
 
-import { HocuspocusProvider } from '@hocuspocus/provider'
+import { TiptapCollabProvider } from '@hocuspocus/provider'
 import CharacterCount from '@tiptap/extension-character-count'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
@@ -15,10 +15,10 @@ import React, {
 } from 'react'
 import * as Y from 'yjs'
 
+import { variables } from '../../../variables'
 import MenuBar from './MenuBar'
 
 const colors = ['#958DF1', '#F98181', '#FBBC88', '#FAF594', '#70CFF8', '#94FADB', '#B9F18D']
-const rooms = ['rooms.60', 'rooms.61', 'rooms.62']
 const names = [
   'Lea Thompson',
   'Cyndi Lauper',
@@ -49,18 +49,19 @@ const names = [
 
 const getRandomElement = list => list[Math.floor(Math.random() * list.length)]
 
-const getRandomRoom = () => getRandomElement(rooms)
+const getRandomRoom = () => {
+  const roomNumbers = variables.collabRooms?.trim()?.split(',') ?? [10, 11, 12]
+
+  return getRandomElement(roomNumbers.map(number => `rooms.${number}`))
+}
 const getRandomColor = () => getRandomElement(colors)
 const getRandomName = () => getRandomElement(names)
 
 const room = getRandomRoom()
 
 const ydoc = new Y.Doc()
-const websocketProvider = new HocuspocusProvider({
-  url: 'wss://connect.hocuspocus.cloud',
-  parameters: {
-    key: 'write_bqgvQ3Zwl34V4Nxt43zR',
-  },
+const websocketProvider = new TiptapCollabProvider({
+  appId: '7j9y6m10',
   name: room,
   document: ydoc,
 })

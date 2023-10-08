@@ -1,4 +1,4 @@
-import { Plugin, PluginKey, Selection } from 'prosemirror-state'
+import { Plugin, PluginKey, Selection } from '@tiptap/pm/state'
 
 import { CommandManager } from '../CommandManager'
 import { Extension } from '../Extension'
@@ -17,14 +17,16 @@ export const Keymap = Extension.create({
         const { selection, doc } = tr
         const { empty, $anchor } = selection
         const { pos, parent } = $anchor
-        const isAtStart = Selection.atStart(doc).from === pos
+        const $parentPos = $anchor.parent.isTextblock ? tr.doc.resolve(pos - 1) : $anchor
+        const parentIsIsolating = $parentPos.parent.type.spec.isolating
 
-        if (
-          !empty
-          || !isAtStart
-          || !parent.type.isTextblock
-          || parent.textContent.length
-        ) {
+        const parentPos = $anchor.pos - $anchor.parentOffset
+
+        const isAtStart = (parentIsIsolating && $parentPos.parent.childCount === 1)
+          ? parentPos === $anchor.pos
+          : Selection.atStart(doc).from === pos
+
+        if (!empty || !isAtStart || !parent.type.isTextblock || parent.textContent.length) {
           return false
         }
 
@@ -37,6 +39,7 @@ export const Keymap = Extension.create({
 
     const handleDelete = () => this.editor.commands.first(({ commands }) => [
       () => commands.deleteSelection(),
+      () => commands.deleteCurrentNode(),
       () => commands.joinForward(),
       () => commands.selectNodeForward(),
     ])
@@ -103,9 +106,14 @@ export const Keymap = Extension.create({
           const allFrom = Selection.atStart(oldState.doc).from
           const allEnd = Selection.atEnd(oldState.doc).to
           const allWasSelected = from === allFrom && to === allEnd
+
+          if (empty || !allWasSelected) {
+            return
+          }
+
           const isEmpty = newState.doc.textBetween(0, newState.doc.content.size, ' ', ' ').length === 0
 
-          if (empty || !allWasSelected || !isEmpty) {
+          if (!isEmpty) {
             return
           }
 

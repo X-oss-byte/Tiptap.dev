@@ -5,21 +5,20 @@ import {
   getMarksBetween,
   NodeWithPos,
 } from '@tiptap/core'
+import { MarkType } from '@tiptap/pm/model'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { find, test } from 'linkifyjs'
-import { MarkType } from 'prosemirror-model'
-import { Plugin, PluginKey } from 'prosemirror-state'
 
 type AutolinkOptions = {
-  type: MarkType,
-  validate?: (url: string) => boolean,
+  type: MarkType
+  validate?: (url: string) => boolean
 }
 
 export function autolink(options: AutolinkOptions): Plugin {
   return new Plugin({
     key: new PluginKey('autolink'),
     appendTransaction: (transactions, oldState, newState) => {
-      const docChanges = transactions.some(transaction => transaction.docChanged)
-        && !oldState.doc.eq(newState.doc)
+      const docChanges = transactions.some(transaction => transaction.docChanged) && !oldState.doc.eq(newState.doc)
       const preventAutolink = transactions.some(transaction => transaction.getMeta('preventAutolink'))
 
       if (!docChanges || preventAutolink) {
@@ -30,16 +29,18 @@ export function autolink(options: AutolinkOptions): Plugin {
       const transform = combineTransactionSteps(oldState.doc, [...transactions])
       const { mapping } = transform
       const changes = getChangedRanges(transform)
+      let needsAutolink = true
 
       changes.forEach(({ oldRange, newRange }) => {
-        // at first we check if we have to remove links
+        // At first we check if we have to remove links.
         getMarksBetween(oldRange.from, oldRange.to, oldState.doc)
           .filter(item => item.mark.type === options.type)
           .forEach(oldMark => {
             const newFrom = mapping.map(oldMark.from)
             const newTo = mapping.map(oldMark.to)
-            const newMarks = getMarksBetween(newFrom, newTo, newState.doc)
-              .filter(item => item.mark.type === options.type)
+            const newMarks = getMarksBetween(newFrom, newTo, newState.doc).filter(
+              item => item.mark.type === options.type,
+            )
 
             if (!newMarks.length) {
               return
@@ -51,21 +52,29 @@ export function autolink(options: AutolinkOptions): Plugin {
             const wasLink = test(oldLinkText)
             const isLink = test(newLinkText)
 
-            // remove only the link, if it was a link before too
-            // because we don’t want to remove links that were set manually
+            if (wasLink) {
+              needsAutolink = false
+            }
+
+            // Remove only the link, if it was a link before too.
+            // Because we don’t want to remove links that were set manually.
             if (wasLink && !isLink) {
-              tr.removeMark(newMark.from, newMark.to, options.type)
+              tr.removeMark(needsAutolink ? newMark.from : newMark.to - 1, newMark.to, options.type)
             }
           })
 
-        // now let’s see if we can add new links
-        const nodesInChangedRanges = findChildrenInRange(newState.doc, newRange, node => node.isTextblock)
+        // Now let’s see if we can add new links.
+        const nodesInChangedRanges = findChildrenInRange(
+          newState.doc,
+          newRange,
+          node => node.isTextblock,
+        )
 
         let textBlock: NodeWithPos | undefined
         let textBeforeWhitespace: string | undefined
 
         if (nodesInChangedRanges.length > 1) {
-          // Grab the first node within the changed ranges (ex. the first of two paragraphs when hitting enter)
+          // Grab the first node within the changed ranges (ex. the first of two paragraphs when hitting enter).
           textBlock = nodesInChangedRanges[0]
           textBeforeWhitespace = newState.doc.textBetween(
             textBlock.pos,
@@ -75,7 +84,7 @@ export function autolink(options: AutolinkOptions): Plugin {
           )
         } else if (
           nodesInChangedRanges.length
-          // We want to make sure to include the block seperator argument to treat hard breaks like spaces
+          // We want to make sure to include the block seperator argument to treat hard breaks like spaces.
           && newState.doc.textBetween(newRange.from, newRange.to, ' ', ' ').endsWith(' ')
         ) {
           textBlock = nodesInChangedRanges[0]
@@ -109,17 +118,25 @@ export function autolink(options: AutolinkOptions): Plugin {
               }
               return true
             })
-            // calculate link position
+            // Calculate link position.
             .map(link => ({
               ...link,
               from: lastWordAndBlockOffset + link.start + 1,
               to: lastWordAndBlockOffset + link.end + 1,
             }))
-            // add link mark
+            // Add link mark.
             .forEach(link => {
-              tr.addMark(link.from, link.to, options.type.create({
-                href: link.href,
-              }))
+              if (getMarksBetween(link.from, link.to, newState.doc).some(item => item.mark.type === options.type)) {
+                return
+              }
+
+              tr.addMark(
+                link.from,
+                link.to,
+                options.type.create({
+                  href: link.href,
+                }),
+              )
             })
         }
       })
