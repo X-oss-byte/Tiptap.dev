@@ -1,9 +1,9 @@
 import { MarkType } from '@tiptap/pm/model'
 
-import { getMarksBetween } from '../helpers/getMarksBetween'
-import { PasteRule, PasteRuleFinder } from '../PasteRule'
-import { ExtendedRegExpMatchArray } from '../types'
-import { callOrReturn } from '../utilities/callOrReturn'
+import { getMarksBetween } from '../helpers/getMarksBetween.js'
+import { PasteRule, PasteRuleFinder } from '../PasteRule.js'
+import { ExtendedRegExpMatchArray } from '../types.js'
+import { callOrReturn } from '../utilities/callOrReturn.js'
 
 /**
  * Build an paste rule that adds a mark when the
@@ -14,14 +14,16 @@ export function markPasteRule(config: {
   type: MarkType
   getAttributes?:
     | Record<string, any>
-    | ((match: ExtendedRegExpMatchArray) => Record<string, any>)
+    | ((match: ExtendedRegExpMatchArray, event: ClipboardEvent) => Record<string, any>)
     | false
     | null
 }) {
   return new PasteRule({
     find: config.find,
-    handler: ({ state, range, match }) => {
-      const attributes = callOrReturn(config.getAttributes, undefined, match)
+    handler: ({
+      state, range, match, pasteEvent,
+    }) => {
+      const attributes = callOrReturn(config.getAttributes, undefined, match, pasteEvent)
 
       if (attributes === false || attributes === null) {
         return null

@@ -1,4 +1,5 @@
 import {
+  DecorationWithType,
   NodeView,
   NodeViewProps,
   NodeViewRenderer,
@@ -6,7 +7,7 @@ import {
   NodeViewRendererProps,
 } from '@tiptap/core'
 import { Node as ProseMirrorNode } from '@tiptap/pm/model'
-import { Decoration, NodeView as ProseMirrorNodeView } from 'prosemirror-view'
+import { Decoration, NodeView as ProseMirrorNodeView } from '@tiptap/pm/view'
 import {
   Component,
   defineComponent,
@@ -16,8 +17,8 @@ import {
   ref,
 } from 'vue'
 
-import { Editor } from './Editor'
-import { VueRenderer } from './VueRenderer'
+import { Editor } from './Editor.js'
+import { VueRenderer } from './VueRenderer.js'
 
 export const nodeViewProps = {
   editor: {
@@ -107,6 +108,13 @@ class VueNodeView extends NodeView<Component, Editor, VueNodeViewRendererOptions
       // @ts-ignore
       // eslint-disable-next-line
       __cssModules: this.component.__cssModules,
+      // add support for vue devtools
+      // @ts-ignore
+      // eslint-disable-next-line
+      __name: this.component.__name,
+      // @ts-ignore
+      // eslint-disable-next-line
+      __file: this.component.__file,
     })
 
     this.renderer = new VueRenderer(extendedComponent, {
@@ -133,7 +141,7 @@ class VueNodeView extends NodeView<Component, Editor, VueNodeViewRendererOptions
     return (contentElement || this.dom) as HTMLElement | null
   }
 
-  update(node: ProseMirrorNode, decorations: Decoration[]) {
+  update(node: ProseMirrorNode, decorations: DecorationWithType[]) {
     const updateProps = (props?: Record<string, any>) => {
       this.decorationClasses.value = this.getDecorationClasses()
       this.renderer.updateProps(props)
@@ -175,12 +183,14 @@ class VueNodeView extends NodeView<Component, Editor, VueNodeViewRendererOptions
     this.renderer.updateProps({
       selected: true,
     })
+    this.renderer.element.classList.add('ProseMirror-selectednode')
   }
 
   deselectNode() {
     this.renderer.updateProps({
       selected: false,
     })
+    this.renderer.element.classList.remove('ProseMirror-selectednode')
   }
 
   getDecorationClasses() {

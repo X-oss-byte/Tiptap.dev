@@ -2,9 +2,13 @@ import { Mark, markPasteRule, mergeAttributes } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import { find, registerCustomProtocol, reset } from 'linkifyjs'
 
-import { autolink } from './helpers/autolink'
-import { clickHandler } from './helpers/clickHandler'
-import { pasteHandler } from './helpers/pasteHandler'
+import { autolink } from './helpers/autolink.js'
+import { clickHandler } from './helpers/clickHandler.js'
+
+export interface LinkProtocolOptions {
+  scheme: string;
+  optionalSlashes?: boolean;
+}
 
 export interface LinkOptions {
   /**
@@ -14,7 +18,7 @@ export interface LinkOptions {
   /**
    * An array of custom protocols to be registered with linkifyjs.
    */
-  protocols: Array<string>
+  protocols: Array<LinkProtocolOptions | string>
   /**
    * If enabled, links will be opened on click.
    */
@@ -41,11 +45,11 @@ declare module '@tiptap/core' {
       /**
        * Set a link mark
        */
-      setLink: (attributes: { href: string; target?: string | null }) => ReturnType
+      setLink: (attributes: { href: string; target?: string | null; rel?: string | null; class?: string | null }) => ReturnType
       /**
        * Toggle a link mark
        */
-      toggleLink: (attributes: { href: string; target?: string | null }) => ReturnType
+      toggleLink: (attributes: { href: string; target?: string | null; rel?: string | null; class?: string | null }) => ReturnType
       /**
        * Unset a link mark
        */
@@ -62,7 +66,13 @@ export const Link = Mark.create<LinkOptions>({
   keepOnSplit: false,
 
   onCreate() {
-    this.options.protocols.forEach(registerCustomProtocol)
+    this.options.protocols.forEach(protocol => {
+      if (typeof protocol === 'string') {
+        registerCustomProtocol(protocol)
+        return
+      }
+      registerCustomProtocol(protocol.scheme, protocol.optionalSlashes)
+    })
   },
 
   onDestroy() {
@@ -95,6 +105,9 @@ export const Link = Mark.create<LinkOptions>({
       },
       target: {
         default: this.options.HTMLAttributes.target,
+      },
+      rel: {
+        default: this.options.HTMLAttributes.rel,
       },
       class: {
         default: this.options.HTMLAttributes.class,
@@ -153,9 +166,22 @@ export const Link = Mark.create<LinkOptions>({
             data: link,
           })),
         type: this.type,
-        getAttributes: match => ({
-          href: match.data?.href,
-        }),
+        getAttributes: (match, pasteEvent) => {
+          const html = pasteEvent.clipboardData?.getData('text/html')
+          const hrefRegex = /href="([^"]*)"/
+
+          const existingLink = html?.match(hrefRegex)
+
+          if (existingLink) {
+            return {
+              href: existingLink[1],
+            }
+          }
+
+          return {
+            href: match.data?.href,
+          }
+        },
       }),
     ]
   },
@@ -175,15 +201,6 @@ export const Link = Mark.create<LinkOptions>({
     if (this.options.openOnClick) {
       plugins.push(
         clickHandler({
-          type: this.type,
-        }),
-      )
-    }
-
-    if (this.options.linkOnPaste) {
-      plugins.push(
-        pasteHandler({
-          editor: this.editor,
           type: this.type,
         }),
       )
