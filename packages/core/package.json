@@ -30,7 +30,7 @@
     "prosemirror-schema-list": "1.2.0",
     "prosemirror-state": "1.4.1",
     "prosemirror-transform": "1.6.0",
-    "prosemirror-view": "1.26.2"
+    "prosemirror-view": "1.42.3"
   },
   "repository": {
     "type": "git",
